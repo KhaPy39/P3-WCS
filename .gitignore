@@ -1,0 +1,23 @@
+#Fichier à ignorer :
+Bitcoin-voiture.png
+Cahier des charges.pdf
+exemple chandelier pbi.png
+Exemple MySQL bitcoin_data.png
+Feuille de Route.docx
+Prépa.docx
+Rétroplanning.png
+Retroplanning.xlsx
+btc_prices_minits.csv
+
+# Ignorer les extensions
+*.pbix
+*.env
+*.log
+
+# Ignorer les répertoires :
+.p3cryptos/
+.github/
+.vscode/
+.data/
+.notebooks/
+.Scripts MySQL
