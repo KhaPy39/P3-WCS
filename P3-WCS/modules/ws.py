@@ -37,8 +37,7 @@ else:
     exit(1)
 if auth_response.session is None:
     print("❌ Aucun token reçu. L’authentification a échoué.")
-else:
-    print("✅ Token reçu :", auth_response.session.access_token)
+
     
 # -----------------------------------------------------------------------------------
 # Variable de contrôle pour arrêt propre
