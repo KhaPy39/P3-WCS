@@ -4,6 +4,7 @@ import threading
 import signal
 import datetime
 import time
+from zoneinfo import ZoneInfo
 import os
 from supabase import create_client, Client
 
@@ -51,7 +52,7 @@ ws = None
 
 def save_to_supabase(timestamp, open_price, high_price, low_price, close_price, volume):
     try:
-        date = datetime.datetime.fromtimestamp(timestamp / 1000).isoformat()
+        date = datetime.datetime.fromtimestamp(timestamp / 1000, tz=ZoneInfo("Europe/Paris")).isoformat()
         data = {
             "date": date,
             "open": round(open_price, 3),
