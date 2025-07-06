@@ -1,10 +1,11 @@
 from supabase_client import get_supabase_connection
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 def main():
     supabase = get_supabase_connection()
 
-    now = datetime.now()
+    now = datetime.now(ZoneInfo("Europe/Paris"))
     # Troncature à la tranche de 15 minutes en cours
     minute = (now.minute // 15) * 15
     segment_start = now.replace(minute=minute, second=0, microsecond=0)
@@ -13,7 +14,7 @@ def main():
     query = f"""
     WITH base AS (
         SELECT
-            date_trunc('minute', date) - interval '1 minute' * (extract(minute from date)::int %% 15) AS slot,
+            date_trunc('minute', date) - interval '1 minute' * (extract(minute from date)::int % 15) AS slot,
             date,
             open,
             high,
