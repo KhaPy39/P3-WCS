@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 def main():
     supabase = get_supabase_connection()
 
-    now = datetime.now()  # Heure locale (heure française, si ta machine est en FR)
+    now = datetime.now(ZoneInfo("Europe/Paris"))  # Heure locale (heure française, si ta machine est en FR)
     segment_start = now.replace(minute=0, second=0, microsecond=0)
     segment_end = segment_start + timedelta(hours=1)
 
