@@ -2,12 +2,12 @@ import subprocess
 import time
 
 scripts = [
-    "modules/update_btc_t15.py",
-    "modules/update_btc_h.py",
-    "modules/update_btc_d.py",
-    "modules/update_btc_w.py",
-    "modules/update_btc_m.py",
-    "modules/update_btc_y.py"
+    "P3-WCS/modules/update_btc_t15.py",
+    "P3-WCS/modules/update_btc_h.py",
+    "P3-WCS/modules/update_btc_d.py",
+    "P3-WCS/modules/update_btc_w.py",
+    "P3-WCS/modules/update_btc_m.py",
+    "P3-WCS/modules/update_btc_y.py"
 ]
 
 while True:
