@@ -1,10 +1,11 @@
 from supabase_client import get_supabase_connection
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 def main():
     supabase = get_supabase_connection()
 
-    now = datetime.now()
+    now = datetime.now(ZoneInfo("Europe/Paris"))
     # Troncature au début de la semaine (lundi à 00h00)
     segment_start = now - timedelta(days=now.weekday())
     segment_start = segment_start.replace(hour=0, minute=0, second=0, microsecond=0)
