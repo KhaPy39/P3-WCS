@@ -1,5 +1,6 @@
 from supabase_client import get_supabase_connection
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 def main():
     supabase = get_supabase_connection()
