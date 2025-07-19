@@ -213,10 +213,13 @@ def clean_indicators(df: pd.DataFrame) -> pd.DataFrame:
 ###----------------------------------------------------------------------------------
 # 3 - Création fonction révélatrice des tendances et étiquettage
 ###----------------------------------------------------------------------------------
-def compute_trend_count(df):
-    trend_ids = [0]
+def compute_trend_count(df, start_id=0):
+    """
+    Ajoute trend_id et trend_count. Reprend à partir de start_id si mode incrémental.
+    """
+    trend_ids = [start_id]
     trend_count = [0]
-    current_id = 0
+    current_id = start_id
     current_count = 0
     last_direction = None
 
@@ -234,7 +237,7 @@ def compute_trend_count(df):
         # Incrémente trend_id si la direction change
         if direction != last_direction and last_direction is not None:
             current_id += 1
-            current_count = 0  # On réinitialise le compteur
+            current_count = 0  # Reset compteur
 
         # Sinon, on poursuit la tendance
         if direction == last_direction:
