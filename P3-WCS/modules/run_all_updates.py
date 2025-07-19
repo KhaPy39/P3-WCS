@@ -12,7 +12,7 @@ price_update_scripts = [
 ]
 
 # PHASE 2 : Mise à jour des tendances et statistiques Supabase
-# trend_update_script = "P3-WCS/modules/main_supabase.py" Scripts en attente de finalisation
+trend_update_script = "P3-WCS/modules/main_supabase.py"
 
 while True:
     print("\n🚀 DÉMARRAGE DU PROCESSUS COMPLET")
