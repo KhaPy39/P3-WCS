@@ -53,7 +53,7 @@ def main():
         response = supabase.postgrest.rpc("execute_sql", {"query": query}).execute()
         print(f"✅ Année {segment_start.year} mise à jour avec succès.")
     except Exception as e:
-        print("❌ Échec RPC :", str(e))
+        print("❌ Table Years - Échec RPC :", str(e))
 
 if __name__ == "__main__":
     main()
