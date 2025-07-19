@@ -50,11 +50,12 @@ def get_interval(table_name: str, unit: str = "minutes") -> int:
 def add_primary_kpis(table_name: str) -> pd.DataFrame:
     ### Connexion à la base Supabae ###
     supabase = get_supabase_connection()
-    data = supabase.table(table_name).select("*").execute()
-    if not data.data:
+    query = f"SELECT * FROM {table_name};"
+    response = supabase.postgrest.rpc("execute_sql", {"query": query}).execute()
+    if not responsee.data:
         raise ValueError(f"⛔ Aucun enregistrement trouvé dans {table_name}")
     else:
-        df = pd.DataFrame(data.data)
+        df = pd.DataFrame(response.data)
     
     df['date'] = pd.to_datetime(df['date'])
     df.attrs["interval"] = get_interval(table_name)
