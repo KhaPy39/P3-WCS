@@ -50,17 +50,52 @@ def fetch_source_data(supabase, table_name, last_start_time=None):
                 .order("date", desc=False) \
                 .execute()
         else:
+            print(f"ℹ️ Aucun filtre appliqué pour {table_name}, récupération complète")
             response = supabase.table(table_name) \
                 .select("*") \
                 .order("date", desc=False) \
                 .execute()
 
         if not response.data or len(response.data) == 0:
-            raise ValueError(f"⛔ Aucun enregistrement trouvé dans {table_name}")
+            print(f"⚠️ Aucune donnée pour {table_name}")
+            return pd.DataFrame()
 
         return pd.DataFrame(response.data)
     except Exception as e:
         raise ValueError(f"❌ Erreur fetch_source_data pour {table_name}: {e}")
+
+def fetch_minits_data_with_trend(supabase):
+    """Requête optimisée pour bitcoin_prices_minits : récupère toutes les bougies depuis le début de la dernière tendance."""
+    query = """
+    WITH derniere_tendance AS (
+        SELECT trend_id, start_time, end_time
+        FROM trend_stats_minits
+        ORDER BY end_time DESC
+        LIMIT 1
+    )
+    SELECT 
+        bp.date,
+        bp.open,
+        bp.high,
+        bp.low,
+        bp.close,
+        bp.volume
+    FROM 
+        bitcoin_prices_minits bp
+    CROSS JOIN 
+        derniere_tendance dt
+    WHERE 
+        bp.date >= dt.start_time
+    ORDER BY 
+        bp.date;
+    """
+
+    response = supabase.rpc("execute_sql", {"query": query}).execute()
+    if not response.data or len(response.data) == 0:
+        print("⚠️ Aucune donnée récupérée via la requête spécifique")
+        return pd.DataFrame()
+
+    return pd.DataFrame(response.data)
 
 def prepare_dataframe(df, table_name):
     """Convertit la date et prépare l'interval."""
@@ -89,20 +124,22 @@ def main():
                 last_trend_id = 0
 
             print(f"⚡ Dernier trend_id : {last_trend_id}, start_time : {last_start_time}")
-
-            # 2. Déterminer le start_id
             start_id = last_trend_id if last_trend_id > 0 else 1
 
-            # 3. Récupération des données sources
-            df = fetch_source_data(supabase, source_table, last_start_time)
+            # 2. Récupération des données
+            if source_table == "bitcoin_prices_minits":
+                df = fetch_minits_data_with_trend(supabase)
+            else:
+                df = fetch_source_data(supabase, source_table, last_start_time)
+
             if df.empty:
                 print(f"⚠️ Aucune nouvelle donnée pour {source_table}")
                 continue
 
-            # 4. Préparer le DataFrame
+            # 3. Préparer le DataFrame
             df = prepare_dataframe(df, source_table)
 
-            # 5. Calcul des tendances
+            # 4. Calcul des tendances
             df = compute_trend_count(df, start_id=start_id)
             trend_stats = extract_trend_stats(df)
 
@@ -133,4 +170,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
