@@ -1,59 +1,73 @@
-from supabase_client import get_supabase_connection
+from supabase_client import login_user
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+import pandas as pd
+import os
+from dotenv import load_dotenv
 
 def main():
-    supabase = get_supabase_connection()
+    load_dotenv()
 
+    # Connexion Supabase authentifiée
+    email = os.getenv("SUPABASE_EMAIL")
+    password = os.getenv("SUPABASE_PASSWORD")
+    supabase = login_user(email, password)
+
+    if not supabase:
+        print("❌ Échec de l'authentification Supabase")
+        return
+
+    # Définir la tranche actuelle (1 jour)
     now = datetime.now(ZoneInfo("Europe/Paris"))
     segment_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     segment_end = segment_start + timedelta(days=1)
 
-    query = f"""
-    WITH base AS (
-        SELECT
-            date_trunc('day', date) AS day,
-            date,
-            open,
-            high,
-            low,
-            close,
-            volume
-        FROM bitcoin_prices_minits
-        WHERE date >= '{segment_start}' AND date < '{segment_end}'
-    ),
-    windowed AS (
-        SELECT
-            day,
-            first_value(open) OVER (PARTITION BY day ORDER BY date) AS open,
-            max(high) OVER (PARTITION BY day) AS high,
-            min(low) OVER (PARTITION BY day) AS low,
-            last_value(close) OVER (PARTITION BY day ORDER BY date ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS close,
-            sum(volume) OVER (PARTITION BY day) AS volume
-        FROM base
-    )
-    INSERT INTO btc_d (date, open, high, low, close, volume)
-    SELECT DISTINCT
-        day AS date,
-        open,
-        high,
-        low,
-        close,
-        volume
-    FROM windowed
-    ON CONFLICT (date) DO UPDATE SET
-        open = EXCLUDED.open,
-        high = EXCLUDED.high,
-        low = EXCLUDED.low,
-        close = EXCLUDED.close,
-        volume = EXCLUDED.volume;
-    """
+    print(f"📌 Agrégation journalière pour : {segment_start} → {segment_end}")
 
     try:
-        response = supabase.postgrest.rpc("execute_sql", {"query": query}).execute()
-        print(f"✅ Segment {segment_start.strftime('%Y-%m-%d')} mis à jour avec succès.")
+        # 1. Récupération des bougies minute
+        response = supabase.table("bitcoin_prices_minits") \
+            .select("*") \
+            .gte("date", segment_start.isoformat()) \
+            .lt("date", segment_end.isoformat()) \
+            .execute()
+
+        if not response.data or len(response.data) == 0:
+            print("⚠️ Aucune donnée trouvée pour ce segment.")
+            return
+
+        df = pd.DataFrame(response.data)
+        df['date'] = pd.to_datetime(df['date'])
+
+        # 2. Agrégation par jour
+        df['slot'] = df['date'].dt.floor('1D')
+        agg = df.groupby('slot').agg({
+            'open': 'first',
+            'high': 'max',
+            'low': 'min',
+            'close': 'last',
+            'volume': 'sum'
+        }).reset_index()
+
+        # 3. Préparer pour Supabase
+        records = []
+        for _, row in agg.iterrows():
+            records.append({
+                "date": row['slot'].strftime('%Y-%m-%dT%H:%M:%S'),
+                "open": float(row['open']),
+                "high": float(row['high']),
+                "low": float(row['low']),
+                "close": float(row['close']),
+                "volume": float(row['volume'])
+            })
+
+        # 4. Upsert dans btc_d
+        supabase.table("btc_d").upsert(records).execute()
+
+        print(f"✅ Segment {segment_start.strftime('%Y-%m-%d')} mis à jour ({len(records)} lignes).")
+
     except Exception as e:
-        print("❌ Échec RPC :", str(e))
+        print("❌ Erreur :", str(e))
 
 if __name__ == "__main__":
     main()
