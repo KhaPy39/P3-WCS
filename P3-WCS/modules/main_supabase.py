@@ -46,7 +46,7 @@ def get_last_trend_info(supabase, dest_table):
 
 def fetch_source_data(supabase, table_name, last_start_time=None):
     """Lit les données depuis Supabase via méthode sécurisée select()."""
-    print(f"ℹ️ variables : {table_name} - last_start_time : [last_start_time}")
+    print(f"ℹ️ variables : {table_name} - last_start_time : {last_start_time}")
     try:
         if last_start_time:
             response = supabase.table(table_name) \
