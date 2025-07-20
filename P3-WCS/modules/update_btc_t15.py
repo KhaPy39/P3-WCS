@@ -41,7 +41,7 @@ def main():
         df['date'] = pd.to_datetime(df['date'])
 
         # 2. Création du slot d'agrégation (troncature en 15 min)
-        df['slot'] = df['date'].dt.floor('15T')
+        df['slot'] = df['date'].dt.floor('15min')
 
         # 3. Agrégation (open = 1ère valeur, close = dernière, high = max, low = min, volume = somme)
         agg = df.groupby('slot').agg({
