@@ -90,17 +90,20 @@ def main():
 
             print(f"⚡ Dernier trend_id : {last_trend_id}, start_time : {last_start_time}")
 
-            # 2. Récupération des données sources
+            # 2. Déterminer le start_id
+            start_id = last_trend_id if last_trend_id > 0 else 1
+
+            # 3. Récupération des données sources
             df = fetch_source_data(supabase, source_table, last_start_time)
             if df.empty:
                 print(f"⚠️ Aucune nouvelle donnée pour {source_table}")
                 continue
 
-            # 3. Préparer le DataFrame
+            # 4. Préparer le DataFrame
             df = prepare_dataframe(df, source_table)
 
-            # 4. Calcul des tendances
-            df = compute_trend_count(df, start_id=last_trend_id)
+            # 5. Calcul des tendances
+            df = compute_trend_count(df, start_id=start_id)
             trend_stats = extract_trend_stats(df)
 
             if trend_stats.empty:
@@ -112,7 +115,7 @@ def main():
                 if "time" in col or col == "date":
                     trend_stats[col] = trend_stats[col].astype(str)
 
-            # ✅ UPDATE de la première tendance (reprend last_trend_id)
+            # ✅ UPDATE de la première tendance avec last_trend_id
             first_record = trend_stats.iloc[0].to_dict()
             supabase.table(dest_table).update(first_record).eq("trend_id", last_trend_id).execute()
 
