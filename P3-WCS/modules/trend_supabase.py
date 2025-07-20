@@ -52,7 +52,7 @@ def add_primary_kpis(table_name: str) -> pd.DataFrame:
     supabase = get_supabase_connection()
     query = f"SELECT * FROM {table_name};"
     response = supabase.postgrest.rpc("execute_sql", {"query": query}).execute()
-    if not responsee.data:
+    if not response.data:
         raise ValueError(f"⛔ Aucun enregistrement trouvé dans {table_name}")
     else:
         df = pd.DataFrame(response.data)
