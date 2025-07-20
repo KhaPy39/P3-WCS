@@ -1,61 +1,77 @@
-from supabase_client import get_supabase_connection
+from supabase_client import login_user
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+import pandas as pd
+import os
+from dotenv import load_dotenv
 
 def main():
-    supabase = get_supabase_connection()
+    load_dotenv()
+    
+    # Connexion Supabase authentifiée
+    email = os.getenv("SUPABASE_EMAIL")
+    password = os.getenv("SUPABASE_PASSWORD")
 
+    supabase = login_user(email, password)
+    if not supabase:
+        print("❌ Échec de l'authentification Supabase")
+        return
+
+    # Définir la tranche actuelle (15 min)
     now = datetime.now(ZoneInfo("Europe/Paris"))
-    # Troncature à la tranche de 15 minutes en cours
     minute = (now.minute // 15) * 15
     segment_start = now.replace(minute=minute, second=0, microsecond=0)
     segment_end = segment_start + timedelta(minutes=15)
 
-    query = f"""
-    WITH base AS (
-        SELECT
-            date_trunc('minute', date) - interval '1 minute' * (extract(minute from date)::int % 15) AS slot,
-            date,
-            open,
-            high,
-            low,
-            close,
-            volume
-        FROM bitcoin_prices_minits
-        WHERE date >= '{segment_start}' AND date < '{segment_end}'
-    ),
-    windowed AS (
-        SELECT
-            slot,
-            first_value(open) OVER (PARTITION BY slot ORDER BY date) AS open,
-            max(high) OVER (PARTITION BY slot) AS high,
-            min(low) OVER (PARTITION BY slot) AS low,
-            last_value(close) OVER (PARTITION BY slot ORDER BY date ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS close,
-            sum(volume) OVER (PARTITION BY slot) AS volume
-        FROM base
-    )
-    INSERT INTO btc_t15 (date, open, high, low, close, volume)
-    SELECT DISTINCT
-        slot AS date,
-        open,
-        high,
-        low,
-        close,
-        volume
-    FROM windowed
-    ON CONFLICT (date) DO UPDATE SET
-        open = EXCLUDED.open,
-        high = EXCLUDED.high,
-        low = EXCLUDED.low,
-        close = EXCLUDED.close,
-        volume = EXCLUDED.volume;
-    """
+    print(f"📌 Agrégation pour la tranche : {segment_start} → {segment_end}")
 
     try:
-        response = supabase.postgrest.rpc("execute_sql", {"query": query}).execute()
-        print(f"✅ Segment {segment_start.strftime('%Y-%m-%d %H:%M')} mis à jour avec succès.")
+        # 1. Récupération des bougies depuis bitcoin_prices_minits
+        response = supabase.table("bitcoin_prices_minits") \
+            .select("*") \
+            .gte("date", segment_start.isoformat()) \
+            .lt("date", segment_end.isoformat()) \
+            .execute()
+
+        if not response.data or len(response.data) == 0:
+            print(f"⚠️ Aucune donnée trouvée pour ce segment.")
+            return
+
+        df = pd.DataFrame(response.data)
+        df['date'] = pd.to_datetime(df['date'])
+
+        # 2. Création du slot d'agrégation (troncature en 15 min)
+        df['slot'] = df['date'].dt.floor('15T')
+
+        # 3. Agrégation (open = 1ère valeur, close = dernière, high = max, low = min, volume = somme)
+        agg = df.groupby('slot').agg({
+            'open': 'first',
+            'high': 'max',
+            'low': 'min',
+            'close': 'last',
+            'volume': 'sum'
+        }).reset_index()
+
+        # 4. Préparer les données pour upsert
+        records = []
+        for _, row in agg.iterrows():
+            records.append({
+                "date": row['slot'].strftime('%Y-%m-%dT%H:%M:%S'),
+                "open": float(row['open']),
+                "high": float(row['high']),
+                "low": float(row['low']),
+                "close": float(row['close']),
+                "volume": float(row['volume'])
+            })
+
+        # 5. Upsert dans btc_t15
+        supabase.table("btc_t15").upsert(records).execute()
+
+        print(f"✅ Segment {segment_start.strftime('%Y-%m-%d %H:%M')} mis à jour ({len(records)} lignes).")
+
     except Exception as e:
-        print("❌ Échec RPC :", str(e))
+        print("❌ Erreur :", str(e))
 
 if __name__ == "__main__":
     main()
+
