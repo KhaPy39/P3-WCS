@@ -28,28 +28,46 @@ TABLES_MAP = {
 
 
 def get_last_trend_info(supabase, dest_table):
-    """Récupère le dernier trend_id et start_time depuis Supabase."""
-    query = f"SELECT trend_id, start_time FROM {dest_table} ORDER BY trend_id DESC LIMIT 1;"
-    response = supabase.postgrest.rpc("execute_sql", {"query": query}).execute()
+    """Récupère le dernier trend_id et start_time avec auth utilisateur."""
+    try:
+        response = supabase.table(dest_table) \
+            .select("trend_id, start_time") \
+            .order("trend_id", desc=True) \
+            .limit(1) \
+            .execute()
 
-    if response.data:
-        return response.data[0]["trend_id"], response.data[0]["start_time"]
-    return 0, None
+        if response.data and len(response.data) > 0:
+            return response.data[0]["trend_id"], response.data[0]["start_time"]
+        else:
+            return 0, None
+    except Exception as e:
+        print(f"❌ Erreur lors de l'accès à {dest_table}: {e}")
+        return 0, None
 
 
 def fetch_source_data(supabase, table_name, last_start_time=None):
-    """Lit les données depuis Supabase, filtrées si nécessaire."""
-    if last_start_time:
-        query = f"SELECT * FROM {table_name} WHERE date >= '{last_start_time}' ORDER BY date;"
-    else:
-        query = f"SELECT * FROM {table_name} ORDER BY date;"
+    """Lit les données depuis Supabase via select()."""
+    try:
+        if last_start_time:
+            response = supabase.table(table_name) \
+                .select("*") \
+                .gte("date", last_start_time) \
+                .order("date", desc=False) \
+                .execute()
+        else:
+            response = supabase.table(table_name) \
+                .select("*") \
+                .order("date", desc=False) \
+                .execute()
 
-    response = supabase.postgrest.rpc("execute_sql", {"query": query}).execute()
+        if not response.data or len(response.data) == 0:
+            raise ValueError(f"⛔ Aucun enregistrement trouvé dans {table_name}")
 
-    if not response.data:
-        raise ValueError(f"⛔ Aucun enregistrement trouvé dans {table_name}")
+        return pd.DataFrame(response.data)
 
-    return pd.DataFrame(response.data)
+    except Exception as e:
+        raise ValueError(f"❌ Erreur fetch_source_data {table_name}: {e}")
+
 
 
 def main():
