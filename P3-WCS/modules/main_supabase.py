@@ -1,8 +1,6 @@
 import os
 from dotenv import load_dotenv
 import pandas as pd
-from datetime import datetime
-from zoneinfo import ZoneInfo
 
 from trend_supabase import (
     add_primary_kpis,
@@ -12,7 +10,7 @@ from trend_supabase import (
 )
 from supabase_client import login_user
 
-# Charger variables d'environnement
+# Charger les variables d'environnement
 load_dotenv()
 
 # Mapping des tables sources → destinations
@@ -28,7 +26,7 @@ TABLES_MAP = {
 
 
 def get_last_trend_info(supabase, dest_table):
-    """Récupère le dernier trend_id et start_time avec auth utilisateur."""
+    """Récupère le dernier trend_id et start_time via accès authentifié."""
     try:
         response = supabase.table(dest_table) \
             .select("trend_id, start_time") \
@@ -40,13 +38,14 @@ def get_last_trend_info(supabase, dest_table):
             return response.data[0]["trend_id"], response.data[0]["start_time"]
         else:
             return 0, None
+
     except Exception as e:
-        print(f"❌ Erreur lors de l'accès à {dest_table}: {e}")
+        print(f"❌ Erreur get_last_trend_info pour {dest_table}: {e}")
         return 0, None
 
 
 def fetch_source_data(supabase, table_name, last_start_time=None):
-    """Lit les données depuis Supabase via select()."""
+    """Lit les données depuis Supabase via méthode sécurisée select()."""
     try:
         if last_start_time:
             response = supabase.table(table_name) \
@@ -66,8 +65,7 @@ def fetch_source_data(supabase, table_name, last_start_time=None):
         return pd.DataFrame(response.data)
 
     except Exception as e:
-        raise ValueError(f"❌ Erreur fetch_source_data {table_name}: {e}")
-
+        raise ValueError(f"❌ Erreur fetch_source_data pour {table_name}: {e}")
 
 
 def main():
@@ -123,4 +121,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
