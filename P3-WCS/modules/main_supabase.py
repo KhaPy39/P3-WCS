@@ -5,17 +5,17 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from trend_supabase import (
-    get_supabase_connection,
     add_primary_kpis,
     clean_indicators,
     compute_trend_count,
     extract_trend_stats
 )
+from supabase_client import login_user
 
-# Charger variables .env
+# Charger variables d'environnement
 load_dotenv()
 
-# Mapping tables sources → destinations
+# Mapping des tables sources → destinations
 TABLES_MAP = {
     "bitcoin_prices_minits": "trend_stats_minits",
     "btc_t15": "trend_stats_15m",
@@ -26,13 +26,16 @@ TABLES_MAP = {
     "btc_y": "trend_stats_years",
 }
 
+
 def get_last_trend_info(supabase, dest_table):
     """Récupère le dernier trend_id et start_time depuis Supabase."""
     query = f"SELECT trend_id, start_time FROM {dest_table} ORDER BY trend_id DESC LIMIT 1;"
     response = supabase.postgrest.rpc("execute_sql", {"query": query}).execute()
+
     if response.data:
         return response.data[0]["trend_id"], response.data[0]["start_time"]
     return 0, None
+
 
 def fetch_source_data(supabase, table_name, last_start_time=None):
     """Lit les données depuis Supabase, filtrées si nécessaire."""
@@ -48,8 +51,16 @@ def fetch_source_data(supabase, table_name, last_start_time=None):
 
     return pd.DataFrame(response.data)
 
+
 def main():
-    supabase = get_supabase_connection()
+    print("\n🔐 Authentification en cours...")
+    supabase = login_user(os.getenv("SUPABASE_EMAIL"), os.getenv("SUPABASE_PASSWORD"))
+
+    if not supabase:
+        print("❌ Échec de l'authentification : arrêt du script.")
+        return
+
+    print("✅ Authentification réussie. Début du traitement des tables...\n")
 
     for source_table, dest_table in TABLES_MAP.items():
         print(f"\n📊 Traitement incrémental : {source_table} → {dest_table}")
@@ -91,7 +102,7 @@ def main():
 
     print("\n✅ Mise à jour incrémentale terminée pour toutes les tables.")
 
+
 if __name__ == "__main__":
     main()
-
 
