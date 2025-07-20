@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 import pandas as pd
 from trend_supabase import (
     get_interval,
-    clean_indicators,  # <-- On peut même supprimer cet import si on n'utilise plus
     compute_trend_count,
     extract_trend_stats
 )
@@ -12,6 +11,7 @@ from supabase_client import login_user
 # Charger les variables d'environnement
 load_dotenv()
 
+# Mapping des tables sources → destinations
 TABLES_MAP = {
     "bitcoin_prices_minits": "trend_stats_minits",
     "btc_t15": "trend_stats_15m",
@@ -23,6 +23,7 @@ TABLES_MAP = {
 }
 
 def get_last_trend_info(supabase, dest_table):
+    """Récupère le dernier trend_id et start_time."""
     try:
         response = supabase.table(dest_table) \
             .select("trend_id, start_time") \
@@ -38,8 +39,13 @@ def get_last_trend_info(supabase, dest_table):
         return 0, None
 
 def fetch_source_data(supabase, table_name, last_start_time=None):
+    """Récupère les données depuis Supabase avec filtre sur date."""
     try:
         if last_start_time:
+            # ✅ Convertir en string pour PostgREST
+            last_start_time = str(last_start_time)
+            print(f"🛠️ Filtre appliqué : date >= {last_start_time}")
+
             response = supabase.table(table_name) \
                 .select("*") \
                 .gte("date", last_start_time) \
@@ -59,7 +65,7 @@ def fetch_source_data(supabase, table_name, last_start_time=None):
         raise ValueError(f"❌ Erreur fetch_source_data pour {table_name}: {e}")
 
 def prepare_dataframe(df, table_name):
-    # Convertir la date et définir l'interval
+    """Convertit la date et prépare l'interval."""
     df['date'] = pd.to_datetime(df['date'])
     df.attrs["interval"] = get_interval(table_name)
     return df
@@ -78,26 +84,33 @@ def main():
         print(f"\n📊 Traitement incrémental : {source_table} → {dest_table}")
 
         try:
+            # 1. Récupérer dernier trend_id et start_time
             last_trend_id, last_start_time = get_last_trend_info(supabase, dest_table)
             print(f"⚡ Dernier trend_id : {last_trend_id}, start_time : {last_start_time}")
             print(f"ℹ️ variables : {source_table} - last_start_time : {last_start_time}")
 
+            # 2. Charger les données sources
             df = fetch_source_data(supabase, source_table, last_start_time)
 
             if df.empty:
                 print(f"⚠️ Aucune nouvelle donnée pour {source_table}")
                 continue
 
-            # Préparer le DataFrame (date + interval)
+            # 3. Préparer le DataFrame (date + interval)
             df = prepare_dataframe(df, source_table)
 
-            # Calcul des tendances
+            # 4. Calcul des tendances
             df = compute_trend_count(df, start_id=last_trend_id + 1)
             trend_stats = extract_trend_stats(df)
 
             if trend_stats.empty:
                 print(f"⚠️ Aucune nouvelle tendance détectée dans {source_table}")
                 continue
+
+            # ✅ Conversion des dates en string avant l'upsert
+            for col in trend_stats.columns:
+                if "time" in col or col == "date":
+                    trend_stats[col] = trend_stats[col].astype(str)
 
             records = trend_stats.to_dict(orient="records")
             supabase.table(dest_table).upsert(records).execute()
