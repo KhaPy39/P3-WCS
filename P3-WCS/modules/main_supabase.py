@@ -13,6 +13,8 @@ load_dotenv()
 
 # Mapping des tables sources → destinations
 TABLES_MAP = {
+    "bitcoin_prices_minits": "trend_stats_minits",
+    "btc_t15": "trend_stats_15m",
     "btc_h": "trend_stats_hours",
     "btc_d": "trend_stats_days",
     "btc_w": "trend_stats_week",
