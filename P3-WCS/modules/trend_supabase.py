@@ -61,13 +61,13 @@ def add_primary_kpis(table_name: str) -> pd.DataFrame:
     df.attrs["interval"] = get_interval(table_name)
     
     freq_map = {
-    "btc_prices_minits": "min",
-    "btc_prices_15m": "15min",
-    "btc_prices_hours": "H",
-    "btc_prices_days": "D",
-    "btc_prices_week": "W",
-    "btc_prices_month": "M",
-    "btc_prices_years": "Y"
+    "bitcoin_prices_minits": "min",
+    "btc_t15": "15min",
+    "btc_h": "H",
+    "btc_d": "D",
+    "btc_w": "W",
+    "btc_m": "M",
+    "btc_y": "Y"
 }
 
     freq = freq_map.get(table_name, "min")
@@ -76,7 +76,7 @@ def add_primary_kpis(table_name: str) -> pd.DataFrame:
     date_range = pd.date_range(start=df['date'].min(), end=df['date'].max(), freq=freq)
     missing_dates = date_range.difference(df['date'])
     
-    if table_name == "btc_prices_minits":
+    if table_name == "bitcoin_prices_minits":
         date_range = pd.date_range(start=df['date'].min(), end=df['date'].max(), freq='min')
         missing_dates = date_range.difference(df['date'])
 
