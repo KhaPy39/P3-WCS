@@ -96,7 +96,7 @@ for table in tables:
         pred = model.predict(X)
         mae = mean_absolute_error(y, pred)
         rmse = mean_squared_error(y, pred) ** 0.5  # ✅ Compatibilité max
-        mape = np.mean(np.abs((y - pred) / y)) * 100
+        mape = np.mean(np.abs((y - pred) / (y + 1e-8))) * 100
         
         print(f"✅ {target} | RMSE: {rmse:.4f} | MAPE: {mape:.4f}%")
 
