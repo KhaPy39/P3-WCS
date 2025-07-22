@@ -82,9 +82,10 @@ for table in tables:
 
     df = df.dropna()
     X = df.drop(columns=["date"] + targets)
+    X = X.replace([np.inf, -np.inf], np.nan).dropna()
     
     for target in targets:
-        y = df[target]
+        y = df.loc[X.index, target]
 
         print(f"\n⚡ Entraînement modèle pour {table} → {target}")
         model = RandomForestRegressor(n_estimators=100, max_depth=None, random_state=42, n_jobs=-1)
@@ -111,4 +112,3 @@ for table in tables:
             print(f"✅ Modèle uploadé/updaté dans Supabase Storage : {model_name}")
         except Exception as e:
             print(f"⚠️ Échec upload Supabase : {model_name} | Erreur : {e}")
-
