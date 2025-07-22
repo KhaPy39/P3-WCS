@@ -95,16 +95,16 @@ for table in tables:
         # Prédictions & métriques (train set)
         pred = model.predict(X)
         mae = mean_absolute_error(y, pred)
-        rmse = mean_squared_error(y, pred) ** 0.5  # ✅ Compatibilité max
-        mape = np.mean(np.abs((y - pred) / (y + 1e-8))) * 100
+        rmse = mean_squared_error(y, pred) ** 0.5
+        mape = np.mean(np.abs((y - pred) / (y + 1e-8))) * 100  # ✅ évite division par 0
         
-        print(f"✅ {target} | RMSE: {rmse:.4f} | MAPE: {mape:.4f}%")
+        print(f"✅ {target} | RMSE: {rmse:.6f} | MAPE: {mape:.2f}%")
 
-        # Sauvegarde modèle localement
+        # Sauvegarde modèle localement (avec compression)
         model_name = f"rf_model_{table}_{target}.pkl"
         local_path = os.path.join(model_dir, model_name)
-        joblib.dump(model, local_path)
-        print(f"💾 Modèle sauvegardé localement : {local_path}")
+        joblib.dump(model, local_path, compress=3)  # ✅ compression ajoutée
+        print(f"💾 Modèle compressé sauvegardé localement : {local_path}")
 
         # Upload dans Supabase Storage
         try:
@@ -113,3 +113,4 @@ for table in tables:
             print(f"✅ Modèle uploadé/updaté dans Supabase Storage : {model_name}")
         except Exception as e:
             print(f"⚠️ Échec upload Supabase : {model_name} | Erreur : {e}")
+
