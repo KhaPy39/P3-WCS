@@ -27,8 +27,21 @@ print("✅ Connexion Supabase OK.")
 tables = ["btc_t15", "btc_h", "btc_d"]
 targets = ["shifted_open", "shifted_high", "shifted_low", "shifted_close", "shifted_volume"]
 max_rows = 500_000
-model_dir = "./P3-WCS/models/"   # A MODIFIER POUR SUPABASE/GITHUB -> "./P3-WCS/models/"
-os.makedirs(model_dir, exist_ok=True)
+local_model_dir = "/tmp/models/"
+bucket_name = "models"
+
+os.makedirs(local_model_dir, exist_ok=True)
+
+# ==========================================
+# ✅ Fonction Upload vers Supabase Storage
+# ==========================================
+def upload_model_to_supabase(file_path, file_name):
+    try:
+        with open(file_path, "rb") as f:
+            supabase.storage.from_(bucket_name).upload(file_name, f)
+        print(f"✅ Modèle uploadé dans Supabase Storage : {file_name}")
+    except Exception as e:
+        print(f"⚠️ Échec upload Supabase : {file_name} | Erreur : {e}")
 
 # ==========================================
 # ✅ Ajout KPI (version locale)
@@ -115,9 +128,8 @@ for table in tables:
     features = features.replace([np.inf, -np.inf], np.nan)
     features = features.dropna()
 
-    # Conversion en float32 (plus léger et sûr)
+    # Conversion en float32
     features = features.astype(np.float32)
-
 
     print(f"\n✅ Table {table} prête : {features.shape[0]} lignes")
 
@@ -130,12 +142,15 @@ for table in tables:
 
         pred = model.predict(features)
         mse = mean_squared_error(y, pred)
-        rmse = mse ** 0.5  
-        mape = mean_absolute_percentage_error(y, pred)
+        rmse = mse ** 0.5
         mape = mean_absolute_percentage_error(y, pred)
         print(f"✅ {target_col} | RMSE: {rmse:.2f} | MAPE: {mape:.2%}")
 
-        # Sauvegarde compressée
-        model_path = os.path.join(model_dir, f"rf_model_{table}_{target_col}.pkl")
-        joblib.dump(model, model_path, compress=3)
-        print(f"💾 Modèle sauvegardé : {model_path}")
+        # Sauvegarde locale (debug) + upload Supabase
+        file_name = f"rf_model_{table}_{target_col}.pkl"
+        local_path = os.path.join(local_model_dir, file_name)
+
+        joblib.dump(model, local_path, compress=3)
+        print(f"💾 Modèle sauvegardé localement : {local_path}")
+
+        upload_model_to_supabase(local_path, file_name)
