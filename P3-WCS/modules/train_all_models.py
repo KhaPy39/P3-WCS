@@ -38,8 +38,8 @@ os.makedirs(local_model_dir, exist_ok=True)
 def upload_model_to_supabase(file_path, file_name):
     try:
         with open(file_path, "rb") as f:
-            supabase.storage.from_(bucket_name).upload(file_name, f)
-        print(f"✅ Modèle uploadé dans Supabase Storage : {file_name}")
+            supabase.storage.from_(bucket_name).upload(file_name, f, {"upsert": "true"})
+        print(f"✅ Modèle uploadé/updaté dans Supabase Storage : {file_name}")
     except Exception as e:
         print(f"⚠️ Échec upload Supabase : {file_name} | Erreur : {e}")
 
