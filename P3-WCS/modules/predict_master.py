@@ -1,6 +1,5 @@
 import os
 import sys
-import argparse
 import pandas as pd
 from datetime import timedelta
 import joblib
@@ -101,4 +100,48 @@ def insert_prediction(pred_table, new_date, new_row):
     print(f"✅ UPSERT {pred_table} | {new_date} | Close = {new_row['close']:.2f}")
 
 # ==========================================
-# ✅ Nouvelle logique : Translation Vec
+# ✅ Nouvelle logique : Translation Vectorielle
+# ==========================================
+def adjust_predictions(pred_values, last_real):
+    delta = last_real["close"] - pred_values["shifted_open"]
+    corrected = {
+        "open": pred_values["shifted_open"] + delta,
+        "high": pred_values["shifted_high"] + delta,
+        "low": pred_values["shifted_low"] + delta,
+        "close": pred_values["shifted_close"] + delta,
+        "volume": pred_values["shifted_volume"]
+    }
+    return corrected
+
+# ==========================================
+# ✅ Batch multi-step avec simulation
+# ==========================================
+def predict_batch(table, pred_table, delta_time, steps):
+    df = get_last_data_block(table)
+    df = add_primary_kpis(df)
+
+    for _ in range(steps):
+        X = df.drop(columns=["date"])
+        X_last = X.iloc[-1:].replace([np.inf, -np.inf], np.nan).ffill().fillna(0)
+        last_real = df.iloc[-1]
+
+        pred_values = {}
+        for target in targets:
+            model = load_model(table, target)
+            pred_values[target] = float(model.predict(X_last)[0])
+
+        corrected = adjust_predictions(pred_values, last_real)
+        new_date = pd.to_datetime(last_real["date"]) + delta_time
+        new_row = {"date": new_date.isoformat(), **corrected}
+
+        insert_prediction(pred_table, new_date, new_row)
+        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+        df = add_primary_kpis(df)
+
+# ==========================================
+# ✅ Main (Ultra simplifié)
+# ==========================================
+if __name__ == "__main__":
+    for table, (pred_table, delta_time, steps) in interval_to_table.items():
+        print(f"\n⚡ Prédictions pour {table} → {steps} bougies")
+        predict_batch(table, pred_table, delta_time, steps)
