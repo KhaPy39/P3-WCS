@@ -9,6 +9,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from supabase_client import login_user
 import ta
+import time
 
 # Ajouter le dossier modules au path
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..', 'modules')))
@@ -66,6 +67,21 @@ def fetch_table(table):
     return df
 
 # ==========================================
+# ✅ Upload Supabase avec retry
+# ==========================================
+def upload_with_retry(file_path, file_name, retries=3):
+    for attempt in range(retries):
+        try:
+            with open(file_path, "rb") as f:
+                supabase.storage.from_(bucket_name).upload(file_name, f, {"upsert": "true"})
+            print(f"✅ Modèle uploadé dans Supabase : {file_name}")
+            return
+        except Exception as e:
+            print(f"⚠️ Tentative {attempt+1}/{retries} échouée pour {file_name} : {e}")
+            time.sleep(3)
+    print(f"❌ Upload abandonné pour {file_name} après {retries} échecs.")
+
+# ==========================================
 # ✅ Entraînement modèles
 # ==========================================
 for table in tables:
@@ -76,9 +92,13 @@ for table in tables:
     # Ajout KPI
     df = add_primary_kpis(df)
 
-    # Cibles = variations relatives
+    # Cibles = variations relatives avec protection division par zéro
     for col in ["open", "high", "low", "close", "volume"]:
-        df[f"shifted_{col}"] = (df[col].shift(-1) - df[col]) / df[col]
+        df[f"shifted_{col}"] = np.where(
+            df[col] != 0,
+            (df[col].shift(-1) - df[col]) / df[col],
+            0
+        )
 
     # Nettoyage
     df = df.dropna()
@@ -87,6 +107,10 @@ for table in tables:
 
     for target in targets:
         y = df.loc[X.index, target]
+        y = y.replace([np.inf, -np.inf], np.nan).dropna()
+
+        # Ajuster X si y a été filtré
+        X = X.loc[y.index]
 
         print(f"\n⚡ Entraînement modèle pour {table} → {target}")
         model = RandomForestRegressor(n_estimators=100, max_depth=None, random_state=42, n_jobs=-1)
@@ -100,17 +124,11 @@ for table in tables:
         
         print(f"✅ {target} | RMSE: {rmse:.6f} | MAPE: {mape:.2f}%")
 
-        # Sauvegarde modèle localement (avec compression)
+        # Sauvegarde modèle compressé
         model_name = f"rf_model_{table}_{target}.pkl"
         local_path = os.path.join(model_dir, model_name)
-        joblib.dump(model, local_path, compress=3)  # ✅ compression ajoutée
+        joblib.dump(model, local_path, compress=3)
         print(f"💾 Modèle compressé sauvegardé localement : {local_path}")
 
-        # Upload dans Supabase Storage
-        try:
-            with open(local_path, "rb") as f:
-                supabase.storage.from_(bucket_name).upload(model_name, f, {"upsert": "true"})
-            print(f"✅ Modèle uploadé/updaté dans Supabase Storage : {model_name}")
-        except Exception as e:
-            print(f"⚠️ Échec upload Supabase : {model_name} | Erreur : {e}")
-
+        # Upload avec retry
+        upload_with_retry(local_path, model_name)
