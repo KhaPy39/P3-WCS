@@ -147,7 +147,7 @@ for table in tables:
         print(f"✅ {target_col} | RMSE: {rmse:.2f} | MAPE: {mape:.2%}")
 
         # Sauvegarde locale (debug) + upload Supabase
-        file_name = f"rf_model_{table}_{target}.pkl"
+        file_name = f"rf_model_{table}_{target_col}.pkl"
         local_path = os.path.join(local_model_dir, file_name)
 
         joblib.dump(model, local_path, compress=3)
