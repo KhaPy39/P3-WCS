@@ -80,10 +80,11 @@ for table in tables:
     for col in ["open", "high", "low", "close", "volume"]:
         df[f"shifted_{col}"] = (df[col].shift(-1) - df[col]) / df[col]
 
+    # Nettoyage
     df = df.dropna()
     X = df.drop(columns=["date"] + targets)
     X = X.replace([np.inf, -np.inf], np.nan).dropna()
-    
+
     for target in targets:
         y = df.loc[X.index, target]
 
@@ -94,7 +95,7 @@ for table in tables:
         # Prédictions & métriques (train set)
         pred = model.predict(X)
         mae = mean_absolute_error(y, pred)
-        rmse = mean_squared_error(y, pred, squared=False)
+        rmse = mean_squared_error(y, pred) ** 0.5  # ✅ Compatibilité max
         mape = np.mean(np.abs((y - pred) / y)) * 100
         
         print(f"✅ {target} | RMSE: {rmse:.4f} | MAPE: {mape:.4f}%")
